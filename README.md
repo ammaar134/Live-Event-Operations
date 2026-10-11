@@ -1,5 +1,7 @@
 # Fieldroom
 
+[![Verification](https://github.com/ammaar134/Live-Event-Operations/actions/workflows/verify.yml/badge.svg)](https://github.com/ammaar134/Live-Event-Operations/actions/workflows/verify.yml)
+
 **Useful things, shared.** A complete local equipment-lending app for a fictional
 club: 15 product models, 28 labelled copies, cameras, workshop tools and outdoor gear.
 Built by Ammaar for a software-engineering portfolio. The repository retains the

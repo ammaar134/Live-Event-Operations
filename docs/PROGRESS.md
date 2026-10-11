@@ -1,31 +1,40 @@
 # Fieldroom handoff
 
-Phase 1 working vertical slice complete. Empty supplied repository is the explicit publication
-destination: ammaar134/Live-Event-Operations. No earlier application history.
-MIT selected by Ammaar. Verified GitHub account ID 96157761 and existing
-noreply Git identity. No cloud deployment or payments.
+Phases 1–4 complete: foundation and booking slice; guarded consistency/lifecycle;
+member and lending-desk operations; original artwork, responsive layouts and accessible
+recovery states. Phase 5 review fixes, documentation, clean-clone verification and
+publication are complete; commit-specific CI results are linked below.
 
-Architecture: React/TypeScript, ASP.NET Core Identity, EF Core, PostgreSQL.
-Local ports 5175 / 5085 / 55435 were free at initial inspection.
-Docker initially stopped; .NET runtime exists but SDK must be installed locally.
+The supplied repository `ammaar134/Live-Event-Operations` was empty and is the explicit
+public destination. It contains only this equipment app. MIT was confirmed by Ammaar.
+Git identity uses the verified account's GitHub noreply address. Implementation and
+release commits were published without rewriting history. No cloud deployment or payments.
 
-Executed: backend build (zero warnings), frontend build, 36 backend tests against
-isolated native PostgreSQL 18.6, 4 component tests, and 3 browser journeys all pass.
-Browser journeys include member booking/change/cancel, two-browser race, mobile
-overflow, keyboard skip link and axe scans of catalog/product. Screenshots inspected.
+Architecture: React/TypeScript, ASP.NET Core Identity, EF Core and PostgreSQL; one
+allocation ledger, post-lock database time, durable idempotency and separate custody.
+Independent review fixes include uncertain-response recovery, stale retry intents,
+safe redirects, manager metadata idempotency/version checks, risk display, wrapped
+database failures and retention of accepted inspection turnaround.
 
-Phase 2 complete: 41 backend tests pass, including persisted conflict outcomes,
-manager mutation retries, optimistic product versions, early-return retention and
-append-only audit. Independent review fixes cover retry intent, redirect validation,
-risk display and wrapped database failures. Seven frontend unit/component tests pass.
-Docker remains unavailable; native local
-setup works. Phase 3 operational workflows pass all five browser journeys, including
-manager pickup/damaged return/inspection/edit, lost response recovery and expired-hold
-rebooking. Aggregate local verification passed (41 backend / 11 frontend / 5 browser)
-before three additional regression tests; the latest backend run is recorded below.
-Phase 4 complete: mobile summary spacing, explicit expired-hold recovery, keyboard
-schedule scrolling, reduced motion, axe checks and inspected desktop/mobile screenshots.
-Phase 5: independent review fixes complete. Latest backend suite: 45 passing tests,
-including direct SQL attempts at two open checkouts for different bookings. An actual
-API process restart preserves the session, booking and original idempotency outcome.
-Final aggregate, clean-clone and remote CI remain. No push yet.
+Local aggregate and a clean clone of `4beea1b` passed: **45 backend / 11 frontend /
+5 browser tests**, real PostgreSQL 18.6, API process restart, formatting/lint/build,
+dependency audits and full reachable-history publication scan. Desktop/mobile screenshots
+were inspected; axe checks cover catalog, product and lending desk. See
+[verification](VERIFICATION.md) for scope and [CI](https://github.com/ammaar134/Live-Event-Operations/actions)
+for commit-specific remote results.
+
+Exact aggregate: `npm ci --prefix web`, `npx --prefix web playwright install chromium`,
+then `node scripts/verify.mjs`. Windows native helper: `./scripts/verify.ps1`.
+The browser runner creates its own database and ports 5095/5185, then removes its
+resources. No production test endpoints or external service dependencies.
+
+Native setup was verified on loopback ports 5175 (web), 5085 (API), 55435 (PostgreSQL).
+Run `./scripts/dev.ps1` and `./scripts/web.ps1` in separate terminals. The optional
+SDK/Node/PostgreSQL binaries are ignored under `.tools`; credentials and local data are
+ignored under `.env`/`.local`. Docker Desktop could not start locally; the image build
+and fresh Compose startup passed on the Linux CI runner. Deployment preparation is
+documentation only. Gitleaks scans all reachable history, including the root commit.
+
+Intentional limits: one organization/asset per loan, no email recovery/verification,
+no payments/uploads/3D, no idempotency retention cleanup, 200 most recent loans in the
+member history. These are documented boundaries, not placeholder routes.

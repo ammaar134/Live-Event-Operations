@@ -6,8 +6,10 @@ Recorded on 2026-10-11, Pacific/Auckland. Run `node scripts/verify.mjs` (or
 Local aggregate run passed: format checks, ESLint, TypeScript and production build;
 **45 backend tests, 11 frontend tests, five Chromium browser journeys**, plus an actual
 API process restart probe. npm/NuGet audits reported no vulnerabilities and the
-reachable-history publication scan passed. Clean-clone and remote CI evidence follow
-after those runs complete.
+reachable-history publication scan passed. A fresh clone of commit `4beea1b`, with
+`npm ci` and no copied build outputs, also passed the entire aggregate against its own
+isolated databases. The SDK/Node runtimes and local PostgreSQL installation were
+supplied externally, as documented; application environment files were not copied.
 
 Backend uses an isolated real PostgreSQL 18.6 database, not SQLite or an in-memory
 provider. Tests cover migration from empty, upgrade preserving an existing product,
@@ -38,7 +40,13 @@ metadata idempotency/version checking, incomplete risk display, wrapped network 
 classification, interrupted body/auth-throttle recovery, and shortened inspection
 turnaround. Review is evidence of a deliberate separate pass, not a security guarantee.
 
-Local Docker Desktop could not start, so Docker image/Compose execution is pending
-remote CI; official image tags were checked with registry manifest requests. CI is
-configured to run the aggregate, build the image, start a fresh local Compose instance,
-check database readiness and the 15-product catalog, and run Gitleaks. No cloud deploy.
+Docker image build and fresh Compose startup **passed in Linux CI**, including empty
+database migrations, health/readiness, the 15-product catalog and same-origin frontend.
+The aggregate also passed on the GitHub Linux runner. Local Docker Desktop could not
+start; native local execution and the independent CI container checks are distinct.
+
+Gitleaks 8.30.1 passed locally over all reachable history with no findings. CI uses
+the same pinned release, verifies its published SHA-256, and scans `--all`, including
+the root commit. No rules or findings are suppressed. The final commit's remote result
+is the authoritative [GitHub Actions run](https://github.com/ammaar134/Live-Event-Operations/actions/workflows/verify.yml),
+linked from the README badge. No cloud deployment was performed.

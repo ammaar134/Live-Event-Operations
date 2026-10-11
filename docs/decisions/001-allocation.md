@@ -10,12 +10,17 @@ Requested instants and buffered occupancy are separate. Occupancy uses finite,
 nonempty `[)` tstzrange values, checked explicitly for nulls, omitted bounds and
 timestamp infinity. Returned loans retain their original buffered occupancy.
 
-Global locking order: policy row (shared), actor/member Identity row (exclusive),
-physical assets in UUID order (exclusive), allocation row, idempotency outcome.
+Global guard order: policy row (shared), actor/member Identity row (exclusive),
+physical asset (exclusive). Each operation affects one asset; any future multi-asset
+operation must acquire assets in UUID order. Allocation reads/transitions run under
+that asset guard, with row-write locks acquired when saved. The idempotency lookup and
+insert run under the actor guard, so duplicate keys cannot race; they need no additional
+independent lock. No path acquires a member or policy lock after an asset lock.
 Every occupancy or custody mutation uses the same transaction wrapper. Actor
 serialization also enforces a member's hold limit across different assets.
-Policy changes take only an exclusive policy lock. Product metadata does not
-change occupancy. Foreign keys and database constraints protect the ledger.
+Policy changes take an exclusive policy lock before the actor lock and persist their
+idempotency outcome in the same transaction. Product edits lock the product after the
+actor and do not change occupancy. Foreign keys and constraints protect the ledger.
 
 After all guards, sample clock_timestamp() in a separate statement. This is the
 temporal decision point, at PostgreSQL microsecond precision. Expiry is <= that

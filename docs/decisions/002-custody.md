@@ -16,7 +16,8 @@ Returns always remain possible for an open loan, including when overdue. A retur
 records condition and accessories, closes custody, and retains the original bounded
 allocation. It never stretches the range into another loan. Every return also sets
 ReadyAt to return time + the accepted turnaround. Damaged equipment enters Inspection;
-an explicit inspection can mark it Ready but starts a new turnaround. During turnaround
+an explicit inspection can mark it Ready but starts a new turnaround, retaining the
+later of existing readiness and the current policy's new turnaround. During turnaround
 the conservative implementation rejects new holds and confirmations even for future
 dates. Existing reservations are not cancelled. Early release of a returned reservation
 is deliberately unsupported; it keeps its original occupancy.

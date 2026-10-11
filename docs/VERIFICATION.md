@@ -1,6 +1,6 @@
 # Verification evidence
 
-Recorded on 2026-10-11, Pacific/Auckland. Run `node scripts/verify.mjs` (or
+Updated on 2026-10-12, Pacific/Auckland after the visual redesign. Run `node scripts/verify.mjs` (or
 `./scripts/verify.ps1` for the optional Windows tool paths and native database).
 
 Local aggregate run passed: format checks, ESLint, TypeScript and production build;
@@ -23,11 +23,15 @@ private ownership, manager authorization, role injection, CSRF and expired ticke
 Browser journeys: member registration/hold/confirm/refresh/back/reschedule/cancel;
 two independent sessions competing for one copy; server-committed response loss and
 expired hold reuse; manager pickup/damaged return/inspection/product edit; desktop
-and 390px mobile layout, keyboard skip link, and axe catalog/product/desk checks.
+and responsive layouts at 320/390/768/1440px, bundled-font loading, category links,
+search/date controls, keyboard skip link, and axe catalog/product/desk checks.
 Frontend unit tests additionally exercise response-body loss, 401/403/429 during
 same-key recovery, rapid duplicate calls, time inputs, session error announcements,
 timezone display and redirect validation. Screenshots in `docs/screenshots` are
-visually inspected; they contain fictional identities only.
+visually inspected; they contain fictional identities only. The 12 October redesign
+passed the full native aggregate again: 45 backend, 11 frontend and five browser
+tests, restart probe, format/lint/build, audits and reachable-history scan. The
+earlier clean-clone result above applies to its named commit, not this later revision.
 
 The restart probe confirms a booking, stops its isolated API process, starts a new
 process against the same database and key directory, then verifies the authenticated

@@ -8,13 +8,15 @@ Built by Ammaar for a software-engineering portfolio. The repository retains the
 user-supplied name `Live-Event-Operations`; this codebase is the separate Fieldroom
 equipment application and contains no event-app or Remote Experiment Lab history.
 
-![Fieldroom collection](docs/screenshots/catalog-desktop.png)
+![Fieldroom collection](docs/screenshots/catalog-overview.png)
 
 Borrowers search the catalog, check dates, hold a specific asset, accept the policy,
 confirm, reschedule atomically and cancel. Managers maintain inventory, block maintenance,
 record pickups and returns, inspect damage, resolve overdue loans and review audit history.
 Every visible action uses persisted API behavior. No payments, cloud services or accounts
 are needed. All artwork is original and local; see [provenance](docs/ASSETS.md).
+The interface uses locally hosted Schibsted Grotesk, a restrained forest/paper palette
+and responsive equipment browsing. [Design research and typography decisions](docs/DESIGN.md).
 
 ## Run locally
 

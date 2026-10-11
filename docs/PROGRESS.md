@@ -5,6 +5,14 @@ member and lending-desk operations; original artwork, responsive layouts and acc
 recovery states. Phase 5 review fixes, documentation, clean-clone verification and
 publication are complete; commit-specific CI results are linked below.
 
+The 12 October visual revision replaces the serif treatment with locally hosted
+Schibsted Grotesk, forest/paper colors, an original borrow/return mark, illustrated
+category links and a responsive catalog rail. Booking, account and desk screens use
+the same hierarchy. The original equipment art remains intact. [Design research](DESIGN.md)
+and [font licensing](ASSETS.md) record the sources and decisions. The full local
+aggregate passed again with 45 backend, 11 frontend and five browser tests, including
+320/390/768px overflow checks and the new browsing controls.
+
 The supplied repository `ammaar134/Live-Event-Operations` was empty and is the explicit
 public destination. It contains only this equipment app. MIT was confirmed by Ammaar.
 Git identity uses the verified account's GitHub noreply address. Implementation and

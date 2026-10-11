@@ -33,7 +33,9 @@ returns enter inspection, and inspection cannot shorten turnaround already promi
 under an accepted policy. Early returns retain the original range. This sacrifices
 some utilization for simple, explainable safety.
 
-The visual design uses cool ivory, graphite, cobalt and original vector still lifes.
+The visual design uses Schibsted Grotesk, forest ink, pale paper and original vector
+still lifes. A [research-led revision](DESIGN.md) replaced the initial serif treatment
+with a consistent type hierarchy, illustrated category links and a responsive catalog rail.
 The date summary emphasizes copy identity and Auckland-local times. Real mobile and
 desktop screenshots and automated accessibility checks revealed a schedule scroller
 that lacked keyboard focus; it was fixed. These checks cover the tested screens and

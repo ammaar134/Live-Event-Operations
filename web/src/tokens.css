@@ -1,12 +1,14 @@
 :root {
-  --paper: #f0f1eb;
-  --surface: #e4e7df;
-  --ink: #252b27;
-  --muted: #656e63;
-  --line: #c9cec3;
-  --blue: #2446bc;
-  --body: Arial, Helvetica, sans-serif;
-  --heading: Georgia, 'Times New Roman', serif;
-  --mono: 'Courier New', monospace;
+  --paper: #f8f9f5;
+  --surface: #e9ece5;
+  --ink: #243b32;
+  --muted: #58665d;
+  --line: #d5dcd2;
+  --blue: #294bcb;
+  --accent: #deee9c;
+  --body: 'Schibsted Grotesk', Arial, sans-serif;
+  --heading: var(--body);
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --space: 8px;
 }

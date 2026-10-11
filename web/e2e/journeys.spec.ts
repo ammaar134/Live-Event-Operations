@@ -195,26 +195,62 @@ test('responsive screenshots, keyboard access and automated accessibility', asyn
 }) => {
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'Your next idea. Already equipped.' }),
+    page.getByRole('heading', { name: 'Good gear. Yours for a while.' }),
   ).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(
     page.getByRole('link', { name: 'Skip to content' }),
   ).toBeFocused();
   await page
-    .getByRole('heading', { name: 'Your next idea. Already equipped.' })
+    .getByRole('heading', { name: 'Good gear. Yours for a while.' })
     .click();
   await page.setViewportSize({ width: 1440, height: 1050 });
+  await expect(
+    page.getByText('15 items to borrow', { exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  expect(
+    await page.evaluate(() => document.fonts.check('16px "Schibsted Grotesk"')),
+  ).toBe(true);
   await page.screenshot({
     path: '../docs/screenshots/catalog-desktop.png',
     fullPage: true,
   });
+  await page.screenshot({ path: '../docs/screenshots/catalog-overview.png' });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: '../docs/screenshots/catalog-mobile.png',
     fullPage: true,
   });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole('link', { name: 'Browse cameras', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Cameras', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByText('5 items to borrow', { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel('Search equipment', { exact: true }).fill('mirrorless');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(
+    page.getByText('1 item to borrow', { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel('Check my dates').check();
+  await expect(page.getByLabel('Pick up', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Return', { exact: true })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -234,4 +270,12 @@ test('responsive screenshots, keyboard access and automated accessibility', asyn
     ),
   ).toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
 });

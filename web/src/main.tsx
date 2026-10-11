@@ -137,10 +137,12 @@ function App() {
       <header className="header">
         <a className="brand" href="/" aria-label="Fieldroom home">
           <span className="brand-mark" aria-hidden="true">
-            f.
+            <svg viewBox="0 0 32 32" fill="none">
+              <path d="M6 11h20l-5-5M26 21H6l5 5" />
+            </svg>
           </span>
           fieldroom
-          <span className="brand-caption">A LIBRARY OF USEFUL THINGS</span>
+          <span className="brand-caption">An equipment library</span>
         </a>
         <nav aria-label="Main navigation">
           <a href="/" aria-current={path === '/' ? 'page' : undefined}>
@@ -186,7 +188,7 @@ function App() {
         <a className="brand" href="/">
           fieldroom.
         </a>
-        <p>More making. Less owning.</p>
+        <p>Good things deserve to be used.</p>
         <span>
           Fictional community library · Local portfolio demo
           <br />
@@ -216,184 +218,262 @@ function Catalog() {
   return (
     <div className="page catalog">
       <section className="hero">
-        <div>
-          <Label>GOOD EQUIPMENT. SHARED POSSIBILITIES.</Label>
+        <div className="hero-heading">
+          <Label>Less to own. More to do.</Label>
           <h1>
-            Your next idea.
+            Good gear.
             <br />
-            <em>Already equipped.</em>
+            Yours for a while.
           </h1>
+        </div>
+        <div className="hero-intro">
           <p>
-            Cameras for a different perspective. Tools for a first attempt.
-            <br className="desktop" /> Good things for getting out there. Borrow
-            what you need.
+            A weekend outside. A project at home. Borrow the equipment for
+            whatever you have in mind.
           </p>
           <a className="text-link" href="#collection">
-            Find your next thing <span aria-hidden="true">↓</span>
+            Explore the collection <span aria-hidden="true">↓</span>
           </a>
         </div>
-        <a
-          className="hero-object"
-          href="/products/10000000-0000-0000-0000-000000000001"
-        >
-          <span className="object-number">01 / THE EVERYDAY MIRRORLESS</span>
-          <Image
-            name="camera"
-            alt="Original illustration of a graphite mirrorless camera"
-            eager
-          />
-          <span className="object-caption">
-            A new point of view. <span aria-hidden="true">↗</span>
+        <div className="equipment-shelf" aria-label="Browse by activity">
+          {[
+            {
+              category: 'Cameras',
+              image: 'camera',
+              note: 'See things differently',
+              number: '01',
+            },
+            {
+              category: 'Tools',
+              image: 'drill',
+              note: 'Make a little progress',
+              number: '02',
+            },
+            {
+              category: 'Outdoors',
+              image: 'tent',
+              note: 'Take the long way home',
+              number: '03',
+            },
+          ].map((item) => (
+            <a
+              key={item.category}
+              className={`shelf-item shelf-${item.image}`}
+              aria-label={`Browse ${item.category.toLowerCase()}`}
+              href="#collection"
+              onClick={() => setCategory(item.category)}
+            >
+              <span className="shelf-top">
+                <span>{item.category}</span>
+                <span className="mono">{item.number}</span>
+              </span>
+              <Image
+                name={item.image}
+                alt={`Original ${item.image} illustration`}
+                eager
+              />
+              <span className="shelf-bottom">
+                {item.note}
+                <span aria-hidden="true">↗</span>
+              </span>
+            </a>
+          ))}
+        </div>
+        <div className="library-note">
+          <span>
+            <span className="small-mark" aria-hidden="true">
+              ↔
+            </span>{' '}
+            Borrow. Use. Bring back.
           </span>
-        </a>
+          <span>One shared collection, plenty of possibilities.</span>
+        </div>
       </section>
-      <div className="library-strip">
-        <span>
-          <b>01</b> Find something useful
-        </span>
-        <span>
-          <b>02</b> Choose your dates & copy
-        </span>
-        <span>
-          <b>03</b> Pick up. Make. Return.
-        </span>
-      </div>
       <section id="collection" className="collection">
         <div className="section-heading">
           <div>
-            <Label>THE SHARED COLLECTION</Label>
             <h2>
-              A little of everything.
-              <br />A lot of possibility.
+              The equipment room<span className="heading-dot">.</span>
             </h2>
           </div>
-          <p>
-            Carefully chosen. Regularly inspected.
-            <br />
-            Ready for a new pair of hands.
-          </p>
+          <p>Find what you need. Leave the rest with us.</p>
         </div>
-        <form
-          className="search-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSubmitted(search);
-          }}
-        >
-          <label className="search-label">
-            <span className="sr-only">Search equipment</span>
-            <input
-              placeholder="Find a camera, a tool, an adventure…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </label>
-          <button type="submit">
-            Search <span aria-hidden="true">↗</span>
-          </button>
-          <label>
-            Sort by
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="name">Name A–Z</option>
-              <option value="category">Category</option>
-            </select>
-          </label>
-        </form>
-        <div className="filter-row">
-          <div className="categories" aria-label="Equipment categories">
-            {['', 'Cameras', 'Tools', 'Outdoors'].map((c) => (
-              <button
-                key={c}
-                className={category === c ? 'selected' : 'quiet'}
-                aria-pressed={category === c}
-                onClick={() => setCategory(c)}
-              >
-                {c || 'Everything'}
-              </button>
-            ))}
-          </div>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={filterTimes}
-              onChange={(e) => setFilterTimes(e.target.checked)}
-            />{' '}
-            Check my dates
-          </label>
-        </div>
-        {filterTimes && (
-          <div className="date-filter">
-            <TimeFields value={times} change={setTimes} />
-            <p className="muted">
-              All times Pacific/Auckland. Availability is checked again when you
-              place a hold.
-            </p>
-          </div>
-        )}
-        {!load.data ? (
-          <Loading error={load.error} retry={load.refresh} />
-        ) : (
-          <>
-            <div className="results-label">
-              <span>
-                {load.data.total.toString().padStart(2, '0')} OBJECTS TO BORROW
-              </span>
-              <span>ONE COMMUNITY. MANY POSSIBILITIES.</span>
+        <div className="catalog-browser">
+          <aside className="catalog-sidebar" aria-label="Browse equipment">
+            <Label>Browse the shelves</Label>
+            <div className="categories" aria-label="Equipment categories">
+              {['', 'Cameras', 'Tools', 'Outdoors'].map((c) => (
+                <button
+                  key={c}
+                  className={category === c ? 'selected' : 'quiet'}
+                  aria-pressed={category === c}
+                  onClick={() => setCategory(c)}
+                >
+                  {c || 'Everything'}
+                  <span aria-hidden="true">↗</span>
+                </button>
+              ))}
             </div>
-            {load.data.products.length === 0 ? (
-              <div className="empty">
-                <h3>Nothing on this shelf yet.</h3>
-                <p>Try a broader search or a different category.</p>
-              </div>
-            ) : (
-              <div className="product-grid">
-                {load.data.products.map((p, i) => {
-                  const available = p.assets.filter((a) => a.available).length;
-                  return (
-                    <a
-                      key={p.id}
-                      className="product-card"
-                      href={`/products/${p.id}`}
-                    >
-                      <div className="product-art">
-                        <span className="inventory-number">
-                          FR / {String(i + 1).padStart(2, '0')}
-                        </span>
-                        <Image
-                          name={p.image}
-                          alt={`Original illustration of ${p.name.toLowerCase()}`}
-                        />
-                        <span className="round-arrow" aria-hidden="true">
-                          ↗
-                        </span>
-                      </div>
-                      <div className="product-meta">
-                        <Label>{p.category}</Label>
-                        <span
-                          className={`availability ${available ? '' : 'unavailable'}`}
-                        >
-                          {available
-                            ? `${available} ${filterTimes ? 'available for your dates' : 'copies · check dates'}`
-                            : 'Currently unavailable'}
-                        </span>
-                      </div>
-                      <h3>{p.name}</h3>
-                      <p>{p.description.split('.')[0]}.</p>
-                    </a>
-                  );
-                })}
+            <div className="shelf-note">
+              <span className="small-mark" aria-hidden="true">
+                ↔
+              </span>
+              <p>Choose your dates to see which copies are available.</p>
+              <span>
+                Inspected between loans.
+                <br />
+                Ready for the next person.
+              </span>
+            </div>
+          </aside>
+          <div className="catalog-results">
+            <form
+              className="search-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSubmitted(search);
+              }}
+            >
+              <label className="search-label">
+                <span className="sr-only">Search equipment</span>
+                <input
+                  placeholder="Search the equipment room"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </label>
+              <button type="submit">
+                Search <span aria-hidden="true">↗</span>
+              </button>
+              <label>
+                Sort by
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  <option value="name">Name A–Z</option>
+                  <option value="category">Category</option>
+                </select>
+              </label>
+            </form>
+            <div className="filter-row">
+              <span className="filter-hint">
+                {category || 'The whole collection'}
+              </span>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={filterTimes}
+                  onChange={(e) => setFilterTimes(e.target.checked)}
+                />{' '}
+                Check my dates
+              </label>
+            </div>
+            {filterTimes && (
+              <div className="date-filter">
+                <TimeFields value={times} change={setTimes} />
+                <p className="muted">
+                  All times Pacific/Auckland. Availability is checked again when
+                  you place a hold.
+                </p>
               </div>
             )}
-          </>
-        )}
+            {!load.data ? (
+              <Loading error={load.error} retry={load.refresh} />
+            ) : (
+              <>
+                <div className="results-label">
+                  <span>
+                    {load.data.total} {load.data.total === 1 ? 'item' : 'items'}{' '}
+                    to borrow
+                  </span>
+                  <span>
+                    {filterTimes
+                      ? 'Showing availability for your dates'
+                      : 'Select an item to find your copy'}
+                  </span>
+                </div>
+                {load.data.products.length === 0 ? (
+                  <div className="empty">
+                    <h3>Nothing on this shelf yet.</h3>
+                    <p>Try a broader search or a different category.</p>
+                  </div>
+                ) : (
+                  <div className="product-grid">
+                    {load.data.products.map((p) => {
+                      const available = p.assets.filter(
+                        (a) => a.available,
+                      ).length;
+                      return (
+                        <a
+                          key={p.id}
+                          className="product-card"
+                          href={`/products/${p.id}`}
+                        >
+                          <div className="product-art">
+                            <span className="inventory-number">
+                              {p.category}
+                            </span>
+                            <Image
+                              name={p.image}
+                              alt={`Original illustration of ${p.name.toLowerCase()}`}
+                            />
+                            <span className="round-arrow" aria-hidden="true">
+                              ↗
+                            </span>
+                          </div>
+                          <h3>{p.name}</h3>
+                          <div className="product-meta">
+                            <span
+                              className={`availability ${available ? '' : 'unavailable'}`}
+                            >
+                              {available
+                                ? `${available} ${filterTimes ? 'available for your dates' : `${available === 1 ? 'copy' : 'copies'} · choose dates`}`
+                                : 'Currently unavailable'}
+                            </span>
+                          </div>
+                          <p>{p.description.split('.')[0]}.</p>
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </section>
-      <section className="closing">
-        <Label>OWN THE EXPERIENCE</Label>
-        <h2>
-          Not everything needs
-          <br />a place in your cupboard.
-        </h2>
-        <p>Borrow well. Take care. Bring it back with a story.</p>
+      <section className="closing" aria-labelledby="how-it-works">
+        <div>
+          <Label>A little give and take</Label>
+          <h2 id="how-it-works">
+            Borrowing is
+            <br />
+            pretty simple.
+          </h2>
+        </div>
+        <ol className="borrow-steps">
+          <li>
+            <span className="mono">01</span>
+            <div>
+              <h3>Find your thing</h3>
+              <p>Choose equipment and a specific copy for your dates.</p>
+            </div>
+          </li>
+          <li>
+            <span className="mono">02</span>
+            <div>
+              <h3>Make it yours for a while</h3>
+              <p>Place a short hold, review your booking, then confirm.</p>
+            </div>
+          </li>
+          <li>
+            <span className="mono">03</span>
+            <div>
+              <h3>Bring it back, pass it on</h3>
+              <p>
+                Collect it from the library and return it with every accessory.
+              </p>
+            </div>
+          </li>
+        </ol>
       </section>
     </div>
   );
@@ -433,9 +513,9 @@ function Detail({ id, session }: { id: string; session?: Session }) {
         ← The collection
       </a>
       <div className="detail-grid">
-        <div>
+        <div className="equipment-detail">
           <div className="detail-art">
-            <Label>FIELDROOM / {p.category.toUpperCase()}</Label>
+            <Label>{p.category} / Fieldroom collection</Label>
             <Image
               name={p.image}
               alt={`Original illustration of ${p.name}`}
@@ -443,11 +523,7 @@ function Detail({ id, session }: { id: string; session?: Session }) {
             />
           </div>
           <div className="details-copy">
-            <h2>
-              A good thing to have
-              <br />
-              <em>for a little while.</em>
-            </h2>
+            <h2>Get to know your gear.</h2>
             <p>{p.description}</p>
             <dl>
               <dt>In the details</dt>
@@ -460,7 +536,7 @@ function Detail({ id, session }: { id: string; session?: Session }) {
           </div>
         </div>
         <div className="booking-panel">
-          <Label>{p.category} / AVAILABLE TO MEMBERS</Label>
+          <Label>{p.category} / Borrow from the library</Label>
           <h1>{p.name}</h1>
           <p className="muted">
             A specific copy, reserved just for your dates.
@@ -522,8 +598,8 @@ function Detail({ id, session }: { id: string; session?: Session }) {
         </div>
       </div>
       <section className="schedule">
-        <Label>THE AVAILABILITY LEDGER</Label>
-        <h2>What’s already on the calendar.</h2>
+        <Label>Plan your pickup</Label>
+        <h2>On the calendar.</h2>
         <p>
           Reserved intervals include turnaround until the time shown. Gaps are
           advisory; a hold secures your copy.
@@ -602,7 +678,7 @@ function Account({
   if (session?.authenticated)
     return (
       <div className="page account-page">
-        <Label>YOUR MEMBERSHIP</Label>
+        <Label>Your membership</Label>
         <h1>Hello, {session.displayName}.</h1>
         <p>{session.email}</p>
         <p>
@@ -633,21 +709,21 @@ function Account({
   return (
     <div className="page auth-grid">
       <div>
-        <Label>GOOD THINGS START HERE</Label>
+        <Label>Your local equipment library</Label>
         <h1>
-          A little access.
+          Welcome to
           <br />
-          <em>A lot of possibility.</em>
+          the equipment room.
         </h1>
         <p>
           One account for the whole collection.
           <br />
-          Find your next project’s missing piece.
+          Book your equipment, collect it, and get started.
         </p>
         <Image name="drill" alt="Original illustration of a cordless drill" />
       </div>
       <section className="auth-form">
-        <Label>{register ? 'JOIN THE LIBRARY' : 'WELCOME BACK'}</Label>
+        <Label>{register ? 'Join the library' : 'Welcome back'}</Label>
         <h2>
           {register ? 'Make yourself at home.' : 'Pick up where you left off.'}
         </h2>
@@ -716,12 +792,8 @@ function MyLoans() {
   const history = load.data.filter((b) => !active.includes(b));
   return (
     <div className="page">
-      <Label>YOUR FIELD NOTES</Label>
-      <h1>
-        Things on loan.
-        <br />
-        <em>Ideas in progress.</em>
-      </h1>
+      <Label>Your borrowing history</Label>
+      <h1>Your loans.</h1>
       {[
         ['Upcoming & in your hands', active],
         ['The archive', history],
@@ -807,7 +879,7 @@ function BookingPage({ id, manager }: { id: string; manager: boolean }) {
       </a>
       <div className="booking-detail">
         <div>
-          <Label>{b.reference || 'A MOMENT TO MAKE IT YOURS'}</Label>
+          <Label>{b.reference || 'Your equipment hold'}</Label>
           <h1>
             {b.state === 'Hold'
               ? 'One last look.'
@@ -832,12 +904,12 @@ function BookingPage({ id, manager }: { id: string; manager: boolean }) {
           </div>
           <div className="interval-summary">
             <div>
-              <Label>PICK UP</Label>
+              <Label>Pick up</Label>
               <strong>{dates(b.start)}</strong>
             </div>
             <span aria-hidden="true">→</span>
             <div>
-              <Label>RETURN</Label>
+              <Label>Return</Label>
               <strong>{dates(b.end)}</strong>
             </div>
           </div>
@@ -1023,7 +1095,7 @@ function BookingPage({ id, manager }: { id: string; manager: boolean }) {
           )}
         </div>
         <aside className="history">
-          <Label>THE RECORD</Label>
+          <Label>The record</Label>
           <h2>Loan history</h2>
           <ol>
             {b.history.map((h, i) => (
@@ -1062,11 +1134,10 @@ function Desk({ session }: { session?: Session }) {
     );
   return (
     <div className="page desk">
-      <Label>FIELDROOM / OPERATIONS</Label>
-      <h1>At the lending counter.</h1>
+      <Label>Fieldroom / Operations</Label>
+      <h1>The lending desk.</h1>
       <p className="muted">
-        A clear view of what’s going out, coming back, and needing a little
-        care.
+        Pickups, returns and equipment that needs attention.
       </p>
       <div className="tabs" role="tablist" aria-label="Desk views">
         {['loans', 'inventory', 'policy', 'audit'].map((t) => (

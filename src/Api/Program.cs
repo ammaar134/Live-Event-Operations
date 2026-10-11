@@ -29,7 +29,7 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.Events.OnRedirectToLogin = c => { c.Response.StatusCode = 401; return Task.CompletedTask; };
     o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
 });
-builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "fieldroom.csrf"; o.Cookie.SameSite = SameSiteMode.Strict; });
+builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "fieldroom.csrf"; o.Cookie.SameSite = SameSiteMode.Strict; o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing") ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; });
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<AllocationService>();
 builder.Services.AddHealthChecks().AddDbContextCheck<LibraryDb>();
@@ -64,7 +64,7 @@ app.Use(async (context, next) =>
             _ when pg?.SqlState == "23P01" => (409, "occupied", "That copy was just reserved or blocked for maintenance. Your previous booking is unchanged. Choose another interval or copy."),
             _ when pg?.SqlState == "23505" => (409, "duplicate", "This action has already been recorded. Refresh to see the current state."),
             _ when pg?.SqlState is "55P03" or "57014" or "40P01" or "40001" => (503, "retryable", "The desk is busy. Retry the same request shortly."),
-            _ when ex is NpgsqlException or TimeoutException => (503, "retryable", "The database connection was interrupted. Retry using the same request key."),
+            _ when ex is NpgsqlException or TimeoutException || ex.InnerException is NpgsqlException or TimeoutException => (503, "retryable", "The database connection was interrupted. Retry using the same request key."),
             _ => (500, "unexpected", "The request could not be completed. Retry with the same request key.")
         };
         if (status == 500) app.Logger.LogError("Unhandled {ExceptionType}; trace {TraceId}", ex.GetType().Name, context.TraceIdentifier);
@@ -92,7 +92,7 @@ app.MapGet("/api/session", async (HttpContext c, UserManager<Member> users) =>
 });
 app.MapPost("/api/session/register", async (RegisterRequest r, UserManager<Member> users, SignInManager<Member> signIn) =>
 {
-    if (string.IsNullOrWhiteSpace(r.Name) || r.Name.Length > 80 || r.Email.Length > 254 || !System.Net.Mail.MailAddress.TryCreate(r.Email, out _) || r.Password.Length > 128)
+    if (string.IsNullOrWhiteSpace(r.Name) || r.Name.Length > 80 || string.IsNullOrWhiteSpace(r.Email) || r.Email.Length > 254 || !System.Net.Mail.MailAddress.TryCreate(r.Email, out _) || string.IsNullOrEmpty(r.Password) || r.Password.Length > 128)
         throw new DomainError(400, "validation", "Enter a name, valid email and password of 12–128 characters.");
     var user = new Member { UserName = r.Email.Trim(), Email = r.Email.Trim(), DisplayName = r.Name.Trim() };
     var result = await users.CreateAsync(user, r.Password);
@@ -102,7 +102,7 @@ app.MapPost("/api/session/register", async (RegisterRequest r, UserManager<Membe
 }).RequireRateLimiting("auth");
 app.MapPost("/api/session/login", async (LoginRequest r, SignInManager<Member> signIn) =>
 {
-    if (r.Email.Length > 254 || r.Password.Length > 128) throw new DomainError(400, "validation", "Invalid sign-in details.");
+    if (string.IsNullOrWhiteSpace(r.Email) || string.IsNullOrEmpty(r.Password) || r.Email.Length > 254 || r.Password.Length > 128) throw new DomainError(400, "validation", "Invalid sign-in details.");
     var result = await signIn.PasswordSignInAsync(r.Email, r.Password, false, true);
     if (!result.Succeeded) throw new DomainError(401, "sign_in", "Sign-in failed. Check your details or try again later.");
     return Results.Ok(new { signedIn = true });

@@ -21,7 +21,10 @@ public class PolicyTests
     }
 
     [Theory]
-    [InlineData("Returned")][InlineData("Cancelled")][InlineData("CheckedOut")][InlineData("Expired")]
+    [InlineData("Returned")]
+    [InlineData("Cancelled")]
+    [InlineData("CheckedOut")]
+    [InlineData("Expired")]
     public void Terminal_or_in_custody_cannot_be_cancelled(string state) => Assert.False(States.CanCancel(state));
 
     [Fact]

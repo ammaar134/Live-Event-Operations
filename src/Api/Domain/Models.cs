@@ -10,6 +10,7 @@ public sealed class Member : IdentityUser
 
 public sealed class Product
 {
+    public int Version { get; set; } = 1;
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
     public string Category { get; set; } = "";

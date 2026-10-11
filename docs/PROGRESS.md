@@ -14,8 +14,10 @@ isolated native PostgreSQL 18.6, 4 component tests, and 3 browser journeys all p
 Browser journeys include member booking/change/cancel, two-browser race, mobile
 overflow, keyboard skip link and axe scans of catalog/product. Screenshots inspected.
 
-Phase 2: harden idempotency error outcomes and all manager mutations. Independent
-review identified retry intent reuse, unsafe next URL, and inconsistent risk display;
-fixes and regression tests are in progress. Docker remains unavailable; native local
+Phase 2 complete: 41 backend tests pass, including persisted conflict outcomes,
+manager mutation retries, optimistic product versions, early-return retention and
+append-only audit. Independent review fixes cover retry intent, redirect validation,
+risk display and wrapped database failures. Seven frontend unit/component tests pass.
+Docker remains unavailable; native local
 setup works. No push yet. Remaining phases: operational verification, UX refinement,
 aggregate checks/CI, documentation and clean-clone/publication verification.

@@ -43,8 +43,19 @@ public static class Endpoints
         {
             var now = await service.Clock();
             return await db.Allocations.AsNoTracking().Where(x => x.MemberId == Actor(c) && x.State != "Maintenance" && x.State != "MaintenanceEnded").OrderByDescending(x => x.CreatedAt).Take(200)
-                .Select(x => new { x.Id, x.Reference, x.Start, x.End, state = x.State == "Hold" && x.ExpiresAt <= now ? "Expired" : x.State, x.ExpiresAt, asset = x.Asset.Tag, product = x.Asset.Product.Name, image = x.Asset.Product.Image,
-                    atRisk = db.Checkouts.Any(k => k.AssetId == x.AssetId && k.ReturnedAt == null && k.Allocation.End <= now) && x.State == "Confirmed" }).ToListAsync();
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Reference,
+                    x.Start,
+                    x.End,
+                    state = x.State == "Hold" && x.ExpiresAt <= now ? "Expired" : x.State,
+                    x.ExpiresAt,
+                    asset = x.Asset.Tag,
+                    product = x.Asset.Product.Name,
+                    image = x.Asset.Product.Image,
+                    atRisk = x.State == "Confirmed" && (x.Asset.State != "Ready" || x.Asset.ReadyAt > (x.Start > now ? x.Start : now) || db.Checkouts.Any(k => k.AssetId == x.AssetId && k.ReturnedAt == null && k.Allocation.End <= now))
+                }).ToListAsync();
         }).RequireAuthorization();
         app.MapGet("/api/bookings/{id:guid}", async (Guid id, HttpContext c, LibraryDb db, AllocationService service) =>
         {
@@ -52,10 +63,26 @@ public static class Endpoints
             var now = await service.Clock();
             var history = await db.AuditEvents.AsNoTracking().Where(x => x.AllocationId == id).OrderBy(x => x.Id).Select(x => new { x.Action, x.Reason, x.At }).ToListAsync();
             var custody = await db.Checkouts.AsNoTracking().Where(x => x.AllocationId == id).Select(x => new { x.PickedUpAt, x.ReturnedAt, x.Condition, x.AccessoryCheck }).SingleOrDefaultAsync();
-            return new { a.Id, a.AssetId, a.Reference, a.Start, a.End, a.ExpiresAt, state = a.State == "Hold" && a.ExpiresAt <= now ? "Expired" : a.State,
-                asset = a.Asset.Tag, product = a.Asset.Product.Name, image = a.Asset.Product.Image, a.Asset.Location, a.Asset.Product.Accessories,
-                policy = JsonSerializer.Deserialize<LendingPolicy>(a.PolicyJson, AllocationService.Json), serverTime = now, history, custody,
-                atRisk = a.State == "Confirmed" && (a.Asset.State != "Ready" || await db.Checkouts.AnyAsync(x => x.AssetId == a.AssetId && x.ReturnedAt == null && x.Allocation.End <= now)) };
+            return new
+            {
+                a.Id,
+                a.AssetId,
+                a.Reference,
+                a.Start,
+                a.End,
+                a.ExpiresAt,
+                state = a.State == "Hold" && a.ExpiresAt <= now ? "Expired" : a.State,
+                asset = a.Asset.Tag,
+                product = a.Asset.Product.Name,
+                image = a.Asset.Product.Image,
+                a.Asset.Location,
+                a.Asset.Product.Accessories,
+                policy = JsonSerializer.Deserialize<LendingPolicy>(a.PolicyJson, AllocationService.Json),
+                serverTime = now,
+                history,
+                custody,
+                atRisk = a.State == "Confirmed" && (a.Asset.State != "Ready" || a.Asset.ReadyAt > (a.Start > now ? a.Start : now) || await db.Checkouts.AnyAsync(x => x.AssetId == a.AssetId && x.ReturnedAt == null && x.Allocation.End <= now))
+            };
         }).RequireAuthorization();
         app.MapPost("/api/bookings/{id:guid}/{action}", async (Guid id, string action, ChangeRequest r, HttpContext c, AllocationService service) => Json(await service.Change(Actor(c), c.User.IsInRole("Manager"), id, action, Key(c), r))).RequireAuthorization();
 
@@ -67,12 +94,38 @@ public static class Endpoints
             if (!string.IsNullOrWhiteSpace(q)) { var term = q[..Math.Min(q.Length, 100)].ToLower(); query = query.Where(x => (x.Reference ?? "").ToLower().Contains(term) || x.Asset.Tag.ToLower().Contains(term) || x.Member.DisplayName.ToLower().Contains(term)); }
             if (state == "Overdue") query = query.Where(x => x.State == "CheckedOut" && x.End <= now);
             else if (!string.IsNullOrWhiteSpace(state)) query = query.Where(x => x.State == state);
-            return new { serverTime = now, total = await query.CountAsync(), bookings = await query.OrderBy(x => x.Start).Skip((Math.Clamp(page ?? 1, 1, 1000) - 1) * 50).Take(50)
-                .Select(x => new { x.Id, x.Reference, x.State, x.Start, x.End, member = x.Member.DisplayName, asset = x.Asset.Tag, product = x.Asset.Product.Name, overdue = x.State == "CheckedOut" && x.End <= now,
-                    atRisk = x.State == "Confirmed" && (x.Asset.State != "Ready" || db.Checkouts.Any(k => k.AssetId == x.AssetId && k.ReturnedAt == null && k.Allocation.End <= now)) }).ToListAsync() };
+            return new
+            {
+                serverTime = now,
+                total = await query.CountAsync(),
+                bookings = await query.OrderBy(x => x.Start).Skip((Math.Clamp(page ?? 1, 1, 1000) - 1) * 50).Take(50)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Reference,
+                    x.State,
+                    x.Start,
+                    x.End,
+                    member = x.Member.DisplayName,
+                    asset = x.Asset.Tag,
+                    product = x.Asset.Product.Name,
+                    overdue = x.State == "CheckedOut" && x.End <= now,
+                    atRisk = x.State == "Confirmed" && (x.Asset.State != "Ready" || x.Asset.ReadyAt > (x.Start > now ? x.Start : now) || db.Checkouts.Any(k => k.AssetId == x.AssetId && k.ReturnedAt == null && k.Allocation.End <= now))
+                }).ToListAsync()
+            };
         });
-        desk.MapGet("/inventory", async (LibraryDb db) => await db.Products.AsNoTracking().OrderBy(x => x.Name).Select(x => new { x.Id, x.Name, x.Category, x.Description, x.Specifications, x.Accessories, x.Image,
-            assets = x.Assets.Select(a => new { a.Id, a.Tag, a.Condition, a.State, a.Location, a.ReadyAt }) }).ToListAsync());
+        desk.MapGet("/inventory", async (LibraryDb db) => await db.Products.AsNoTracking().OrderBy(x => x.Name).Select(x => new
+        {
+            x.Id,
+            x.Version,
+            x.Name,
+            x.Category,
+            x.Description,
+            x.Specifications,
+            x.Accessories,
+            x.Image,
+            assets = x.Assets.Select(a => new { a.Id, a.Tag, a.Condition, a.State, a.Location, a.ReadyAt })
+        }).ToListAsync());
         desk.MapGet("/audit", async (LibraryDb db, int? page) => await db.AuditEvents.AsNoTracking().OrderByDescending(x => x.Id).Skip((Math.Clamp(page ?? 1, 1, 1000) - 1) * 100).Take(100).ToListAsync());
         desk.MapPost("/maintenance", async (MaintenanceRequest r, HttpContext c, AllocationService service) => Json(await service.Maintenance(Actor(c), Key(c), new IntervalRequest(r.AssetId, r.Start, r.End), r.Reason)));
         desk.MapPost("/assets/{id:guid}/{action}", async (Guid id, string action, ChangeRequest r, HttpContext c, AllocationService service) => Json(await service.AssetChange(Actor(c), id, action, Key(c), r)));
@@ -80,26 +133,46 @@ public static class Endpoints
         {
             if (r.Name.Length is < 2 or > 120 || r.Category is not ("Cameras" or "Tools" or "Outdoors") || r.Description.Length is < 10 or > 2000 || r.Specifications.Length > 1000 || r.Accessories.Length > 1000 || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500)
                 throw new DomainError(400, "validation", "Check product field lengths, category and reason.");
-            await using var tx = await db.Database.BeginTransactionAsync();
-            var p = await db.Products.SingleOrDefaultAsync(x => x.Id == id) ?? throw new DomainError(404, "not_found", "Product not found.");
-            p.Name = r.Name; p.Category = r.Category; p.Description = r.Description; p.Specifications = r.Specifications; p.Accessories = r.Accessories;
-            service.Audit(Actor(c), "ProductEdited", $"Product {id}: {r.Reason}", await service.Clock());
-            await db.SaveChangesAsync(); await tx.CommitAsync(); return Results.Ok(new { p.Id });
+            return Json(await service.Metadata(Actor(c), "product-edit", Key(c), new { id, r }, false, async (_, now) =>
+            {
+                var p = (await db.Products.FromSqlInterpolated($"SELECT * FROM \"Products\" WHERE \"Id\"={id} FOR UPDATE").ToListAsync()).SingleOrDefault() ?? throw new DomainError(404, "not_found", "Product not found.");
+                if (p.Version != r.Version) throw new DomainError(409, "stale_product", "Another manager updated this product. Refresh before editing.");
+                p.Name = r.Name; p.Category = r.Category; p.Description = r.Description; p.Specifications = r.Specifications; p.Accessories = r.Accessories;
+                p.Version++;
+                service.Audit(Actor(c), "ProductEdited", $"Product {id}: {r.Reason}", now);
+                return new { p.Id, p.Version };
+            }));
         });
         desk.MapPost("/policy", async (PolicyRequest r, HttpContext c, LibraryDb db, AllocationService service) =>
         {
             PolicyRules.Validate(r.Policy);
             if (string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500) throw new DomainError(400, "reason_required", "Provide a reason for this policy change.");
-            await using var tx = await db.Database.BeginTransactionAsync();
-            await db.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout = '5s'");
-            var p = (await db.Policies.FromSqlRaw("SELECT * FROM \"Policies\" WHERE \"Id\" = 1 FOR UPDATE").ToListAsync()).Single();
-            if (r.Policy.Version != p.Version) throw new DomainError(409, "stale_policy", "Policy changed since you opened it. Refresh first.");
-            r.Policy.Id = 1; r.Policy.Version = p.Version + 1; db.Entry(p).CurrentValues.SetValues(r.Policy);
-            service.Audit(Actor(c), "PolicyChanged", $"Version {r.Policy.Version}: {r.Reason}", await service.Clock());
-            await db.SaveChangesAsync(); await tx.CommitAsync(); return Results.Ok(r.Policy);
+            return Json(await service.Metadata(Actor(c), "policy-edit", Key(c), r, true, (p, now) =>
+            {
+                if (r.Policy.Version != p.Version) throw new DomainError(409, "stale_policy", "Policy changed since you opened it. Refresh first.");
+                r.Policy.Id = 1; r.Policy.Version = p.Version + 1; db.Policies.Attach(p); db.Entry(p).CurrentValues.SetValues(r.Policy);
+                service.Audit(Actor(c), "PolicyChanged", $"Version {r.Policy.Version}: {r.Reason}", now);
+                return Task.FromResult<object>(r.Policy);
+            }));
         });
+        desk.MapPost("/products", async (NewProductRequest r, HttpContext c, LibraryDb db, AllocationService service) => Json(await service.Metadata(Actor(c), "product-create", Key(c), r, false, (_, now) =>
+        {
+            if (r.Name.Length is < 2 or > 120 || r.Category is not ("Cameras" or "Tools" or "Outdoors") || r.Description.Length is < 10 or > 2000 || r.Specifications.Length > 1000 || r.Accessories.Length > 1000 || !new[] { "camera", "compact", "drill", "sander", "tent", "pack", "lantern", "mat", "cookset", "tripod", "microphone", "light", "clamps", "measure", "jigsaw" }.Contains(r.Image) || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500)
+                throw new DomainError(400, "validation", "Check product fields, illustration and reason.");
+            var p = new Product { Name = r.Name, Category = r.Category, Description = r.Description, Specifications = r.Specifications, Accessories = r.Accessories, Image = r.Image };
+            db.Products.Add(p); service.Audit(Actor(c), "ProductCreated", $"Product {p.Id}: {r.Reason}", now); return Task.FromResult<object>(new { p.Id });
+        })));
+        desk.MapPost("/assets", async (NewAssetRequest r, HttpContext c, LibraryDb db, AllocationService service) => Json(await service.Metadata(Actor(c), "asset-create", Key(c), r, false, async (_, now) =>
+        {
+            if (r.Tag.Length is < 3 or > 40 || !r.Tag.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '-') || r.Condition.Length is < 3 or > 150 || r.Location.Length is < 3 or > 200 || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500 || !await db.Products.AnyAsync(x => x.Id == r.ProductId))
+                throw new DomainError(400, "validation", "Choose an existing product, unique inventory label, condition, location and reason.");
+            var asset = new Asset { ProductId = r.ProductId, Tag = r.Tag, Condition = r.Condition, Location = r.Location };
+            db.Assets.Add(asset); await db.SaveChangesAsync(); service.Audit(Actor(c), "AssetAdded", r.Reason, now, asset.Id); return new { asset.Id, asset.Tag };
+        })));
     }
 }
 public sealed record MaintenanceRequest(Guid AssetId, string Start, string End, string Reason);
-public sealed record ProductRequest(string Name, string Category, string Description, string Specifications, string Accessories, string Reason);
+public sealed record ProductRequest(string Name, string Category, string Description, string Specifications, string Accessories, string Reason, int Version);
+public sealed record NewProductRequest(string Name, string Category, string Description, string Specifications, string Accessories, string Reason, string Image);
+public sealed record NewAssetRequest(Guid ProductId, string Tag, string Condition, string Location, string Reason);
 public sealed record PolicyRequest(LendingPolicy Policy, string Reason);

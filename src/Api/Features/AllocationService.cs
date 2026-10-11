@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using NpgsqlTypes;
 
 namespace Fieldroom;
@@ -20,25 +21,42 @@ public sealed class AllocationService(LibraryDb db)
         db.AuditEvents.Add(new AuditEvent { ActorId = actor, Action = action, Reason = reason, At = at, AssetId = asset, AllocationId = allocation });
 
     // Shared lock protocol for every mutation affecting an asset's occupancy or custody.
-    public async Task<string> Guard(string actor, Guid assetId, string operation, string key, object payload,
+    public Task<string> Guard(string actor, Guid assetId, string operation, string key, object payload,
         Func<Asset, LendingPolicy, DateTime, Task<object>> change)
+        => Transaction(actor, assetId, operation, key, payload, false, (asset, policy, now) => change(asset!, policy, now));
+
+    public Task<string> Metadata(string actor, string operation, string key, object payload, bool policyExclusive,
+        Func<LendingPolicy, DateTime, Task<object>> change)
+        => Transaction(actor, null, operation, key, payload, policyExclusive, (_, policy, now) => change(policy, now));
+
+    private static string Recover(string response)
+    {
+        using var json = JsonDocument.Parse(response);
+        if (json.RootElement.TryGetProperty("error", out var e))
+            throw new DomainError(e.GetProperty("status").GetInt32(), e.GetProperty("code").GetString()!, e.GetProperty("message").GetString()!);
+        return response;
+    }
+
+    private async Task<string> Transaction(string actor, Guid? assetId, string operation, string key, object payload,
+        bool policyExclusive, Func<Asset?, LendingPolicy, DateTime, Task<object>> change)
     {
         if (key.Length is < 16 or > 100 || !key.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
             throw new DomainError(400, "idempotency_required", "A valid Idempotency-Key is required. Retry with the same key.");
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload, Json))));
         await using var tx = await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout = '5s'; SET LOCAL statement_timeout = '15s'");
-        var policy = (await db.Policies.FromSqlRaw("SELECT * FROM \"Policies\" WHERE \"Id\" = 1 FOR SHARE").AsNoTracking().ToListAsync()).Single();
+        var policy = (await db.Policies.FromSqlRaw(policyExclusive ? "SELECT * FROM \"Policies\" WHERE \"Id\" = 1 FOR UPDATE" : "SELECT * FROM \"Policies\" WHERE \"Id\" = 1 FOR SHARE").AsNoTracking().ToListAsync()).Single();
         _ = (await db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {actor} FOR UPDATE").ToListAsync()).SingleOrDefault()
             ?? throw new DomainError(401, "session_expired", "Please sign in again.");
-        var asset = (await db.Assets.FromSqlInterpolated($"SELECT * FROM \"Assets\" WHERE \"Id\" = {assetId} FOR UPDATE").ToListAsync()).SingleOrDefault()
-            ?? throw new DomainError(404, "not_found", "Equipment not found.");
+        Asset? asset = null;
+        if (assetId != null) asset = (await db.Assets.FromSqlInterpolated($"SELECT * FROM \"Assets\" WHERE \"Id\" = {assetId.Value} FOR UPDATE").ToListAsync()).SingleOrDefault()
+                ?? throw new DomainError(404, "not_found", "Equipment not found.");
         var previous = await db.Idempotency.FindAsync(actor, operation, key);
         if (previous != null)
         {
             if (previous.Digest != digest) throw new DomainError(409, "key_reused", "This retry key belongs to a different request.");
             await tx.CommitAsync();
-            return previous.Response;
+            return Recover(previous.Response);
         }
         var now = await Clock();
         var expired = await db.Allocations.Where(x => x.AssetId == assetId && x.State == "Hold" && x.ExpiresAt <= now).ToListAsync();
@@ -48,12 +66,25 @@ public sealed class AllocationService(LibraryDb db)
             Audit(actor, "HoldExpired", "Server-controlled hold elapsed", now, assetId, hold.Id);
         }
         await db.SaveChangesAsync();
-        var result = await change(asset, policy, now);
-        var response = JsonSerializer.Serialize(result, Json);
+        await tx.CreateSavepointAsync("business_change");
+        string response;
+        try
+        {
+            var result = await change(asset, policy, now);
+            await db.SaveChangesAsync();
+            response = JsonSerializer.Serialize(result, Json);
+        }
+        catch (Exception ex) when (ex is DomainError || ex.InnerException is PostgresException { SqlState: "23P01" or "23505" })
+        {
+            await tx.RollbackToSavepointAsync("business_change");
+            db.ChangeTracker.Clear();
+            var error = ex as DomainError ?? new DomainError(409, "occupied", "That copy is already reserved, in use or blocked for maintenance. Choose another interval or copy; any previous booking is unchanged.");
+            response = JsonSerializer.Serialize(new { error = new { status = error.Status, code = error.Code, message = error.Message } }, Json);
+        }
         db.Idempotency.Add(new Idempotency { MemberId = actor, Operation = operation, Key = key, Digest = digest, Response = response, CreatedAt = now });
         await db.SaveChangesAsync();
         await tx.CommitAsync();
-        return response;
+        return Recover(response);
     }
 
     private async Task Ready(Asset asset, DateTime now, bool pickup = false)
@@ -75,9 +106,17 @@ public sealed class AllocationService(LibraryDb db)
             if (await db.Allocations.CountAsync(x => x.MemberId == actor && x.State == "Hold" && x.ExpiresAt > now) >= policy.HoldLimit)
                 throw new DomainError(409, "hold_limit", "You have reached your active hold limit. Release a hold or let it expire.");
             var (start, end) = PolicyRules.Interval(request.Start, request.End, policy, now);
-            var a = new Allocation { AssetId = asset.Id, MemberId = actor, Start = start, End = end,
+            var a = new Allocation
+            {
+                AssetId = asset.Id,
+                MemberId = actor,
+                Start = start,
+                End = end,
                 Occupied = new NpgsqlRange<DateTime>(start, true, end.AddMinutes(policy.BufferMinutes), false),
-                ExpiresAt = now.AddSeconds(policy.HoldSeconds), CreatedAt = now, PolicyJson = JsonSerializer.Serialize(policy, Json) };
+                ExpiresAt = now.AddSeconds(policy.HoldSeconds),
+                CreatedAt = now,
+                PolicyJson = JsonSerializer.Serialize(policy, Json)
+            };
             db.Allocations.Add(a);
             Audit(actor, "HoldCreated", "Member selected this specific copy", now, asset.Id, a.Id);
             return View(a, now);
@@ -166,8 +205,17 @@ public sealed class AllocationService(LibraryDb db)
                 throw new DomainError(409, "physical_custody", "Receive this copy before scheduling maintenance; retired copies cannot be allocated.");
             var s = PolicyRules.Resolve(request.Start, policy.TimeZone); var e = PolicyRules.Resolve(request.End, policy.TimeZone);
             if (s >= e || e <= now || e > now.AddDays(365)) throw new DomainError(400, "duration", "Choose a valid maintenance interval within one year.");
-            var a = new Allocation { AssetId = asset.Id, MemberId = actor, State = "Maintenance", Start = s, End = e,
-                Occupied = new NpgsqlRange<DateTime>(s, true, e, false), CreatedAt = now, PolicyJson = JsonSerializer.Serialize(policy, Json) };
+            var a = new Allocation
+            {
+                AssetId = asset.Id,
+                MemberId = actor,
+                State = "Maintenance",
+                Start = s,
+                End = e,
+                Occupied = new NpgsqlRange<DateTime>(s, true, e, false),
+                CreatedAt = now,
+                PolicyJson = JsonSerializer.Serialize(policy, Json)
+            };
             db.Allocations.Add(a); Audit(actor, "MaintenanceCreated", reason, now, asset.Id, a.Id);
             return View(a, now);
         });

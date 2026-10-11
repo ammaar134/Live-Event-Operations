@@ -69,4 +69,31 @@ public class SecurityTests(DatabaseFixture f)
         using var client = f.App.CreateClient(new() { AllowAutoRedirect = false, HandleCookies = false }); client.DefaultRequestHeaders.Add("Cookie", $"fieldroom.session={expired}");
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/bookings")).StatusCode);
     }
+
+    [Fact]
+    public async Task Manager_policy_retry_recovers_original_result_without_duplicate_audit()
+    {
+        using var client = await Login("desk@fieldroom.example");
+        var policy = (await client.GetFromJsonAsync<JsonElement>("/api/policy")).GetProperty("policy").Deserialize<LendingPolicy>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var initialVersion = policy.Version; policy.BufferMinutes = 60;
+        client.DefaultRequestHeaders.Add("Idempotency-Key", DatabaseFixture.Key());
+        var request = new { policy, reason = "Review local lending policy" };
+        var first = await client.PostAsJsonAsync("/api/desk/policy", request); Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var retry = await client.PostAsJsonAsync("/api/desk/policy", request); Assert.Equal(await first.Content.ReadAsStringAsync(), await retry.Content.ReadAsStringAsync());
+        await using var db = f.Db(); Assert.Equal(initialVersion + 1, (await db.Policies.SingleAsync()).Version);
+        Assert.Equal(1, await db.AuditEvents.CountAsync(x => x.Action == "PolicyChanged" && x.Reason.Contains("Review local lending policy")));
+    }
+
+    [Fact]
+    public async Task Product_retry_and_optimistic_version_prevent_lost_updates()
+    {
+        using var client = await Login("desk@fieldroom.example"); await using var db = f.Db(); var product = await db.Products.AsNoTracking().FirstAsync();
+        var r = new ProductRequest(product.Name, product.Category, product.Description, product.Specifications, product.Accessories, "Description checked", product.Version);
+        client.DefaultRequestHeaders.Add("Idempotency-Key", DatabaseFixture.Key());
+        var first = await client.PostAsJsonAsync($"/api/desk/products/{product.Id}", r); Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var retry = await client.PostAsJsonAsync($"/api/desk/products/{product.Id}", r); Assert.Equal(await first.Content.ReadAsStringAsync(), await retry.Content.ReadAsStringAsync());
+        client.DefaultRequestHeaders.Remove("Idempotency-Key"); client.DefaultRequestHeaders.Add("Idempotency-Key", DatabaseFixture.Key());
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync($"/api/desk/products/{product.Id}", r)).StatusCode);
+        Assert.Equal(1, await db.AuditEvents.CountAsync(x => x.Action == "ProductEdited" && x.Reason.Contains("Description checked")));
+    }
 }

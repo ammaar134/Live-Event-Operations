@@ -40,7 +40,14 @@ public sealed class DatabaseFixture : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<LibraryDb>();
         // Proves an empty install AND the upgrade from baseline schema to guards.
         await db.GetService<IMigrator>().MigrateAsync("20261011055442_InitialLibrary");
+        var sentinel = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "Products" ("Id","Name","Category","Description","Specifications","Accessories","Image")
+            VALUES ({sentinel},'Upgrade sentinel','Tools','Existing product survives upgrade','Fixture','Fixture','drill')
+            """);
         await db.Database.MigrateAsync();
+        Assert.Equal("Upgrade sentinel", (await db.Products.SingleAsync(x => x.Id == sentinel)).Name);
+        await db.Products.Where(x => x.Id == sentinel).ExecuteDeleteAsync();
         await Seed.Run(scope.ServiceProvider, Password);
         await Seed.Run(scope.ServiceProvider, Password);
         Assert.Equal(15, await db.Products.CountAsync());

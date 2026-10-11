@@ -96,4 +96,32 @@ public class SecurityTests(DatabaseFixture f)
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync($"/api/desk/products/{product.Id}", r)).StatusCode);
         Assert.Equal(1, await db.AuditEvents.CountAsync(x => x.Action == "ProductEdited" && x.Reason.Contains("Description checked")));
     }
+
+    [Fact]
+    public async Task Null_manager_fields_are_validation_errors_not_server_errors()
+    {
+        using var client = await Login("desk@fieldroom.example");
+        client.DefaultRequestHeaders.Add("Idempotency-Key", DatabaseFixture.Key());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/desk/products", new { name = (string?)null, category = "Tools", description = "A sample tool", specifications = "spec", accessories = "case", image = "drill", reason = "intake" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/desk/assets", new { tag = (string?)null, productId = Guid.NewGuid(), condition = "Good", location = "Counter", reason = "intake" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/desk/policy", new { policy = (object?)null, reason = "review" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Member_and_desk_views_mark_inspection_and_turnaround_as_at_risk()
+    {
+        await using var db = f.Db(); await db.Database.ExecuteSqlRawAsync("UPDATE \"Allocations\" SET \"State\"='Released' WHERE \"State\"='Hold'");
+        var asset = await f.Asset();
+        var json = await new AllocationService(db).Hold(f.Member1, DatabaseFixture.Key(), DatabaseFixture.Interval(asset));
+        var id = JsonDocument.Parse(json).RootElement.GetProperty("id").GetGuid();
+        await new AllocationService(db).Change(f.Member1, false, id, "confirm", DatabaseFixture.Key(), new("Accepted"));
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Assets\" SET \"State\"='Inspection' WHERE \"Id\"={asset}");
+        using var member = await Login("alex@example.test");
+        var list = await member.GetFromJsonAsync<JsonElement>("/api/bookings"); Assert.True(list.EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == id).GetProperty("atRisk").GetBoolean());
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Assets\" SET \"State\"='Ready', \"ReadyAt\"=(SELECT \"Start\" + interval '30 minutes' FROM \"Allocations\" WHERE \"Id\"={id}) WHERE \"Id\"={asset}");
+        var detail = await member.GetFromJsonAsync<JsonElement>($"/api/bookings/{id}"); Assert.True(detail.GetProperty("atRisk").GetBoolean());
+        using var manager = await Login("desk@fieldroom.example");
+        var reference = detail.GetProperty("reference").GetString();
+        var desk = await manager.GetFromJsonAsync<JsonElement>($"/api/desk/bookings?q={reference}"); Assert.True(desk.GetProperty("bookings")[0].GetProperty("atRisk").GetBoolean());
+    }
 }

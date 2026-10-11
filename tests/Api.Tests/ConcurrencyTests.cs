@@ -241,4 +241,14 @@ public class ConcurrencyTests(DatabaseFixture f)
         await new AllocationService(db).Metadata(f.Manager, "policy-test", DatabaseFixture.Key(), new { change = 5 }, true, (p, _) => { db.Policies.Attach(p); p.LeadMinutes += 5; p.Version++; return Task.FromResult<object>(p); });
         Assert.Equal(original, (await db.Allocations.AsNoTracking().SingleAsync(x => x.Id == h.Id)).PolicyJson);
     }
+
+    [Fact]
+    public async Task Inspection_cannot_shorten_existing_return_turnaround()
+    {
+        var asset = await f.Asset(); await using var db = f.Db();
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Assets\" SET \"State\"='Inspection', \"ReadyAt\"=clock_timestamp()+interval '2 hours' WHERE \"Id\"={asset}");
+        var original = (await db.Assets.AsNoTracking().SingleAsync(x => x.Id == asset)).ReadyAt;
+        await new AllocationService(db).AssetChange(f.Manager, asset, "inspect", DatabaseFixture.Key(), new("Repaired and safety checked"));
+        Assert.Equal(original, (await db.Assets.AsNoTracking().SingleAsync(x => x.Id == asset)).ReadyAt);
+    }
 }

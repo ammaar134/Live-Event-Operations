@@ -131,7 +131,7 @@ public static class Endpoints
         desk.MapPost("/assets/{id:guid}/{action}", async (Guid id, string action, ChangeRequest r, HttpContext c, AllocationService service) => Json(await service.AssetChange(Actor(c), id, action, Key(c), r)));
         desk.MapPost("/products/{id:guid}", async (Guid id, ProductRequest r, HttpContext c, LibraryDb db, AllocationService service) =>
         {
-            if (r.Name.Length is < 2 or > 120 || r.Category is not ("Cameras" or "Tools" or "Outdoors") || r.Description.Length is < 10 or > 2000 || r.Specifications.Length > 1000 || r.Accessories.Length > 1000 || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500)
+            if (r.Name is not { Length: >= 2 and <= 120 } || r.Category is not ("Cameras" or "Tools" or "Outdoors") || r.Description is not { Length: >= 10 and <= 2000 } || r.Specifications is null || r.Specifications.Length > 1000 || r.Accessories is null || r.Accessories.Length > 1000 || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500)
                 throw new DomainError(400, "validation", "Check product field lengths, category and reason.");
             return Json(await service.Metadata(Actor(c), "product-edit", Key(c), new { id, r }, false, async (_, now) =>
             {
@@ -145,6 +145,7 @@ public static class Endpoints
         });
         desk.MapPost("/policy", async (PolicyRequest r, HttpContext c, LibraryDb db, AllocationService service) =>
         {
+            if (r.Policy is null) throw new DomainError(400, "validation", "A policy is required.");
             PolicyRules.Validate(r.Policy);
             if (string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500) throw new DomainError(400, "reason_required", "Provide a reason for this policy change.");
             return Json(await service.Metadata(Actor(c), "policy-edit", Key(c), r, true, (p, now) =>
@@ -157,14 +158,14 @@ public static class Endpoints
         });
         desk.MapPost("/products", async (NewProductRequest r, HttpContext c, LibraryDb db, AllocationService service) => Json(await service.Metadata(Actor(c), "product-create", Key(c), r, false, (_, now) =>
         {
-            if (r.Name.Length is < 2 or > 120 || r.Category is not ("Cameras" or "Tools" or "Outdoors") || r.Description.Length is < 10 or > 2000 || r.Specifications.Length > 1000 || r.Accessories.Length > 1000 || !new[] { "camera", "compact", "drill", "sander", "tent", "pack", "lantern", "mat", "cookset", "tripod", "microphone", "light", "clamps", "measure", "jigsaw" }.Contains(r.Image) || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500)
+            if (r.Name is not { Length: >= 2 and <= 120 } || r.Category is not ("Cameras" or "Tools" or "Outdoors") || r.Description is not { Length: >= 10 and <= 2000 } || r.Specifications is null || r.Specifications.Length > 1000 || r.Accessories is null || r.Accessories.Length > 1000 || !new[] { "camera", "compact", "drill", "sander", "tent", "pack", "lantern", "mat", "cookset", "tripod", "microphone", "light", "clamps", "measure", "jigsaw" }.Contains(r.Image) || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500)
                 throw new DomainError(400, "validation", "Check product fields, illustration and reason.");
             var p = new Product { Name = r.Name, Category = r.Category, Description = r.Description, Specifications = r.Specifications, Accessories = r.Accessories, Image = r.Image };
             db.Products.Add(p); service.Audit(Actor(c), "ProductCreated", $"Product {p.Id}: {r.Reason}", now); return Task.FromResult<object>(new { p.Id });
         })));
         desk.MapPost("/assets", async (NewAssetRequest r, HttpContext c, LibraryDb db, AllocationService service) => Json(await service.Metadata(Actor(c), "asset-create", Key(c), r, false, async (_, now) =>
         {
-            if (r.Tag.Length is < 3 or > 40 || !r.Tag.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '-') || r.Condition.Length is < 3 or > 150 || r.Location.Length is < 3 or > 200 || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500 || !await db.Products.AnyAsync(x => x.Id == r.ProductId))
+            if (r.Tag is not { Length: >= 3 and <= 40 } || !r.Tag.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '-') || r.Condition is not { Length: >= 3 and <= 150 } || r.Location is not { Length: >= 3 and <= 200 } || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 500 || !await db.Products.AnyAsync(x => x.Id == r.ProductId))
                 throw new DomainError(400, "validation", "Choose an existing product, unique inventory label, condition, location and reason.");
             var asset = new Asset { ProductId = r.ProductId, Tag = r.Tag, Condition = r.Condition, Location = r.Location };
             db.Assets.Add(asset); await db.SaveChangesAsync(); service.Audit(Actor(c), "AssetAdded", r.Reason, now, asset.Id); return new { asset.Id, asset.Tag };

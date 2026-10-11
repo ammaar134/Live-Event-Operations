@@ -19,5 +19,10 @@ manager mutation retries, optimistic product versions, early-return retention an
 append-only audit. Independent review fixes cover retry intent, redirect validation,
 risk display and wrapped database failures. Seven frontend unit/component tests pass.
 Docker remains unavailable; native local
-setup works. No push yet. Remaining phases: operational verification, UX refinement,
-aggregate checks/CI, documentation and clean-clone/publication verification.
+setup works. Phase 3 operational workflows pass all five browser journeys, including
+manager pickup/damaged return/inspection/edit, lost response recovery and expired-hold
+rebooking. Aggregate local verification passed (41 backend / 11 frontend / 5 browser)
+before three additional regression tests; the latest backend run is recorded below.
+Phase 4: final mobile spacing, focus/scroll accessibility, screenshot inspection.
+Phase 5: independent review fixes complete; final checks, clean-clone and remote CI
+remain. No push yet.

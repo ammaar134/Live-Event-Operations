@@ -138,19 +138,37 @@ async function request<T>(
       'Connection interrupted. Retry this action; its request key is preserved.',
     );
   }
-  // A received success/business response ends this user attempt. Network/5xx
-  // responses leave the key available for recovery after an unknown commit.
-  if (scope && response.status < 500) {
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    if ([401, 403, 429].includes(response.status)) payload = {};
+    else
+      throw new ApiError(
+        0,
+        'network',
+        'Connection interrupted while receiving the result. Retry this action; its request key is preserved.',
+      );
+  }
+  // Headers alone are not an outcome. Body loss, auth, CSRF, throttling and 5xx
+  // preserve the uncertain attempt, including after a committed response was lost.
+  const known =
+    response.ok ||
+    (response.status < 500 &&
+      ![401, 403, 429].includes(response.status) &&
+      payload.code &&
+      payload.code !== 'csrf');
+  if (scope && known) {
     const slot = `fieldroom.retry.${scope}`;
     const record = JSON.parse(sessionStorage.getItem(slot) || 'null');
-    if (record)
+    if (record?.key === headers['Idempotency-Key'])
       sessionStorage.setItem(
         slot,
         JSON.stringify({ ...record, completed: true }),
       );
   }
   if (!response.ok) {
-    const e = await response.json().catch(() => ({}));
+    const e = payload;
     if (e.code === 'csrf') await csrf();
     throw new ApiError(
       response.status,
@@ -158,12 +176,14 @@ async function request<T>(
       e.message ||
         (response.status === 401
           ? 'Your session has expired. Sign in again.'
-          : response.status === 403
-            ? 'This area is for lending-desk managers.'
-            : 'Unable to load this page. Please retry.'),
+          : response.status === 429
+            ? 'Too many requests. Wait a minute, then retry the same action.'
+            : response.status === 403
+              ? 'This area is for lending-desk managers.'
+              : 'Unable to load this page. Please retry.'),
     );
   }
-  return response.json();
+  return payload;
 }
 export function dates(instant: string, options?: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('en-NZ', {

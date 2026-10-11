@@ -235,7 +235,9 @@ public sealed class AllocationService(LibraryDb db)
             else if (action == "inspect")
             {
                 if (asset.State != "Inspection" || await db.Checkouts.AnyAsync(x => x.AssetId == id && x.ReturnedAt == null)) throw Conflict();
-                asset.State = "Ready"; asset.Condition = "Inspected — good"; asset.ReadyAt = now.AddMinutes(policy.BufferMinutes);
+                asset.State = "Ready"; asset.Condition = "Inspected — good";
+                var inspectedReady = now.AddMinutes(policy.BufferMinutes);
+                asset.ReadyAt = asset.ReadyAt > inspectedReady ? asset.ReadyAt : inspectedReady;
             }
             else if (action == "edit")
             {

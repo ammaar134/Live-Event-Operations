@@ -1,0 +1,53 @@
+name: verify
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: fieldroom
+          POSTGRES_PASSWORD: ci-local-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U fieldroom -d postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=fieldroom;Password=ci-local-only
+      E2E_ADMIN_URL: postgres://fieldroom:ci-local-only@127.0.0.1:5432/postgres
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - run: npm ci --prefix web
+      - run: npx --prefix web playwright install --with-deps chromium
+      - run: node scripts/verify.mjs
+      - run: docker build -t fieldroom-ci .
+      - name: Compose startup, migrations and same-origin smoke
+        shell: bash
+        run: |
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          export BOOTSTRAP_PASSWORD="Fr!$(openssl rand -hex 24)a"
+          docker compose up --build --wait
+          curl --fail http://127.0.0.1:5175/health/ready
+          curl --fail http://127.0.0.1:5175/api/catalog > /tmp/fieldroom-catalog.json
+          node -e "const c=require('/tmp/fieldroom-catalog.json');if(c.total!==15)process.exit(1)"
+          curl --fail http://127.0.0.1:5175/ > /dev/null
+          docker compose down --volumes
+      - uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

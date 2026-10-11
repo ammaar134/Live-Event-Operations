@@ -103,6 +103,20 @@ public class ConcurrencyTests(DatabaseFixture f)
     }
 
     [Fact]
+    public async Task Different_bookings_cannot_have_two_open_checkouts_for_one_asset()
+    {
+        await ClearHolds(); var asset = await f.Asset();
+        var first = await Hold(f.Member1, DatabaseFixture.Interval(asset));
+        var second = await Hold(f.Member2, DatabaseFixture.Interval(asset, startHour: 14, endHour: 16));
+        await Change(f.Member1, first.Id, "confirm"); await Change(f.Member2, second.Id, "confirm");
+        await using var db = f.Db();
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Checkouts\" (\"Id\",\"AllocationId\",\"AssetId\",\"PickedUpAt\") VALUES ({Guid.NewGuid()},{first.Id},{asset},clock_timestamp())");
+        var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Checkouts\" (\"Id\",\"AllocationId\",\"AssetId\",\"PickedUpAt\") VALUES ({Guid.NewGuid()},{second.Id},{asset},clock_timestamp())"));
+        Assert.Equal("23505", error.SqlState); Assert.Equal("IX_Checkouts_AssetId", error.ConstraintName);
+        Assert.Equal(1, await db.Checkouts.CountAsync(x => x.AssetId == asset && x.ReturnedAt == null));
+    }
+
+    [Fact]
     public async Task Confirmation_waiting_on_lock_samples_time_after_expiry()
     {
         await ClearHolds(); var a = await f.Asset(); var h = await Hold(f.Member1, DatabaseFixture.Interval(a));

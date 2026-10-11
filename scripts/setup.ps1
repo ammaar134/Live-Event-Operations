@@ -9,7 +9,7 @@ if (!(Test-Path .env)) {
 }
 Get-Content .env | ForEach-Object { $k,$v = $_.Split('=',2); if ($k -match '^[A-Z_]+$') { [Environment]::SetEnvironmentVariable($k,$v,'Process') } }
 if (!$Native) {
-    docker compose up --build -d
+    docker compose up --build --wait
     if ($LASTEXITCODE) { throw 'Docker Compose failed. Start Docker Desktop or use the documented native option.' }
     Write-Output 'Fieldroom: http://localhost:5175. Manager: desk@fieldroom.example. Password is in ignored .env.'
     exit

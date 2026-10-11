@@ -1,0 +1,39 @@
+name: fieldroom-equipment
+services:
+  db:
+    image: postgres:18.6-bookworm
+    environment:
+      POSTGRES_DB: fieldroom
+      POSTGRES_USER: fieldroom
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/setup.ps1 first}
+    volumes:
+      - fieldroom-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fieldroom -d fieldroom"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  app:
+    build: .
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      AutoMigrate: "true"
+      ConnectionStrings__Library: Host=db;Database=fieldroom;Username=fieldroom;Password=${POSTGRES_PASSWORD}
+      BootstrapPassword: ${BOOTSTRAP_PASSWORD:?Run scripts/setup.ps1 first}
+      DataProtectionPath: /app/keys
+    ports:
+      - "127.0.0.1:5175:8080"
+    volumes:
+      - fieldroom-keys:/app/keys
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+volumes:
+  fieldroom-db:
+  fieldroom-keys:

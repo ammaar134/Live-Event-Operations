@@ -85,10 +85,14 @@ test('manager picks up, receives damaged equipment, inspects and edits inventory
       product.getByRole('button', { name: 'Save product' }),
     ).toHaveCount(0);
     await page.getByRole('tab', { name: 'Loans' }).click();
+    await expect(
+      page.getByRole('link', { name: 'FR-DESK-TEST' }),
+    ).toBeVisible();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({
       path: '../docs/screenshots/lending-desk.png',
       fullPage: true,
+      animations: 'disabled',
     });
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     const record = (

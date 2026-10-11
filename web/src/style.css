@@ -1131,6 +1131,7 @@ td:last-child {
   .auth-grid,
   .booking-detail {
     grid-template-columns: 1fr;
+    row-gap: 32px;
   }
   .detail-art {
     padding: 18px;

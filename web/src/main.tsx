@@ -846,6 +846,12 @@ function BookingPage({ id, manager }: { id: string; manager: boolean }) {
           </p>
           <PolicyNote p={b.policy} />
           <ErrorBox message={error} />
+          {['Expired', 'Released'].includes(b.state) && (
+            <div className="notice">
+              This hold is no longer active.{' '}
+              <a href="/">Choose equipment and dates again →</a>
+            </div>
+          )}
           {b.state === 'Hold' && (
             <div className="confirm-box">
               <p role="timer" aria-label="Hold time remaining">

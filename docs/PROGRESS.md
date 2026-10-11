@@ -23,6 +23,9 @@ setup works. Phase 3 operational workflows pass all five browser journeys, inclu
 manager pickup/damaged return/inspection/edit, lost response recovery and expired-hold
 rebooking. Aggregate local verification passed (41 backend / 11 frontend / 5 browser)
 before three additional regression tests; the latest backend run is recorded below.
-Phase 4: final mobile spacing, focus/scroll accessibility, screenshot inspection.
-Phase 5: independent review fixes complete; final checks, clean-clone and remote CI
-remain. No push yet.
+Phase 4 complete: mobile summary spacing, explicit expired-hold recovery, keyboard
+schedule scrolling, reduced motion, axe checks and inspected desktop/mobile screenshots.
+Phase 5: independent review fixes complete. Latest backend suite: 45 passing tests,
+including direct SQL attempts at two open checkouts for different bookings. An actual
+API process restart preserves the session, booking and original idempotency outcome.
+Final aggregate, clean-clone and remote CI remain. No push yet.
